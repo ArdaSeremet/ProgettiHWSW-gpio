@@ -1,0 +1,25 @@
+{
+  "name": "gpio-controller",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "jshint app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArdaSeremet/SBC-RealTimeIO.git"
+  },
+  "author": "",
+  "license": "GPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/ArdaSeremet/SBC-RealTimeIO/issues"
+  },
+  "homepage": "https://github.com/ArdaSeremet/SBC-RealTimeIO#readme",
+  "dependencies": {
+    "cron": "^1.8.2",
+    "express": "^4.17.1",
+    "jshint": "^2.11.1",
+    "socket.io": "^2.3.0"
+  }
+}
