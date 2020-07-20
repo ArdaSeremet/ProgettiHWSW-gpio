@@ -41,7 +41,7 @@ echo '----'
 echo 'Getting project files from Github'
 cd ~
 git clone https://github.com/ArdaSeremet/ProgettiHWSW-gpio.git
-cd ProgettiHHWSW-gpio
+cd ProgettiHWSW-gpio
 npm install
 echo '----'
 
