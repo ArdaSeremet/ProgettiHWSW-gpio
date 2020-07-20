@@ -48,6 +48,7 @@ echo '----'
 echo 'Setting MAC address for security file.'
 macAddress=$(cat /sys/class/net/eth0/address)
 macAddress=${macAddress: -5}
+cd ~/ProgettiHWSW-gpio
 sudo touch security.txt
 echo $macAddress >> security.txt
 echo '----'
