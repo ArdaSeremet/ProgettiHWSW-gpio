@@ -63,7 +63,7 @@ const controlMAC = () => {
 controlMAC();
 setInterval(controlMAC, 15000);
 
-app.use(function(req, res, next) {
+pp.use(function(req, res, next) {
 	res.header("Access-Control-Allow-Origin", "*");
 	res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
 	next();
@@ -76,7 +76,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/getconf', (req, res) => {
-	res.end(json_encode(ioData));
+	res.json(ioData);
 });
 
 app.get('/settings', (req, res) => {
@@ -87,30 +87,33 @@ app.get('/reboot', (req, res) => {
 	if(!req.headers.authorization || req.headers.authorization.indexOf('Basic ') === -1) {
 		res.statusCode = 401;
 		res.setHeader('WWW-Authenticate', 'Basic realm="Secure Area"');
-		res.end('Authorization is required!');
+		res.json({
+			'status': 'error',
+			'message': 'Authorization is required!'
+		});
 	}
 	const base64Credentials = req.headers.authorization.split(' ')[1];
 	const credentials = Buffer.from(base64Credentials, 'base64').toString('ascii');
 	const [username, password] = credentials.split(':');
 	if(username != httpAuthentication.username || password != httpAuthentication.password) {
 		res.statusCode = 401;
-		res.write(json_encode({
+		res.json({
 			'status': 'error',
 			'message': 'Invalid Authentication Credentials!'
-		}));
+		});
 	}
 
 	try {
-		res.send(json_encode({
+		res.json({
 			'status': 'success',
 			'message': 'The request has been sent to the server!'
-		}));
+		});
 		execSync('systemctl reboot');
 	} catch(e) {
-		res.send(json_encode({
+		res.json({
 			'status': 'error',
 			'message': 'An error occured while processing your request. Try again later.'
-		}));
+		});
 	}
 });
 
@@ -159,8 +162,10 @@ app.get('/index.htm', (req, res) => {
 			if(pinNumber in ioData.controllable_pins) {
 				changeState(pinNumber, '1', success => {
 					if(success != true) {
-						res.write('An error occured');
-						res.end();
+						res.json({
+							'status': 'error',
+							'message': 'Couldn\'t turn on the pin as monostable!'
+						});
 						return;
 					}
 					setTimeout(() => {
@@ -170,8 +175,15 @@ app.get('/index.htm', (req, res) => {
 							}
 						});
 					}, 3000);
-					res.write('Success');
-					res.end();
+					res.json({
+						'status': 'success',
+						'message': 'Successfully turned on the pin as monostable!'
+					});
+				});
+			} else {
+				res.json({
+					'status': 'error',
+					'message': 'Invalid pin number, please add it first!'
 				});
 			}
 		} else if(command >= 116 && command < 200) {
@@ -179,12 +191,21 @@ app.get('/index.htm', (req, res) => {
 			if(pinNumber in ioData.controllable_pins) {
 				changeState(pinNumber, '0', success => {
 					if(success != true) {
-						res.write('An error occured');
-						res.end();
+						res.json({
+							'status': 'error',
+							'message': 'Couldn\'t turn off the pin!'
+						});
 						return;
 					}
-					res.write('Success');
-					res.end();
+					res.json({
+						'status': 'success',
+						'message': 'Successfully turned off the pin!'
+					});
+				});
+			} else {
+				res.json({
+					'status': 'error',
+					'message': 'Invalid pin number, please add it first!'
 				});
 			}
 		} else if(command >= 16 && command < 116) {
@@ -192,42 +213,59 @@ app.get('/index.htm', (req, res) => {
 			if(pinNumber in ioData.controllable_pins) {
 				changeState(pinNumber, '1', success => {
 					if(success != true) {
-						res.write('An error occured');
-						res.end();
+						res.json({
+							'status': 'error',
+							'message': 'Couldn\'t turn on the pin!'
+						});
 						return;
 					}
-					res.write('Success');
-					res.end();
+					res.json({
+						'status': 'success',
+						'message': 'Successfully turned on the pin!'
+					});
+				});
+			} else {
+				res.json({
+					'status': 'error',
+					'message': 'Invalid pin number, please add it first!'
 				});
 			}
 		} else if(command >= 0 && command < 16) {
 			let pinNumber = command;
 			if(pinNumber in ioData.controllable_pins) {
 				readState(pinNumber, state => {
-					if(state != true) {
-						res.write('An error occured');
-						res.end();
-						return;
-					}
 					let changeTo = (state == '1') ? '0' : '1';
 					changeState(pinNumber, changeTo, success => {
 						if(success != true) {
-							res.write('An error occured');
-							res.end();
+							res.json({
+								'status': 'error',
+								'message': 'Error while toggling the pin!'
+							});
 							return;
 						}
-						res.write('Success');
-						res.end();
+						res.json({
+							'status': 'success',
+							'message': 'Successfully toggled the pin!'
+						});
 					});
+				});
+			} else {
+				res.json({
+					'status': 'error',
+					'message': 'Invalid pin number, please add it first!'
 				});
 			}
 		} else {
-			res.write('Invalid command sent!');
-			res.end();
+			res.json({
+				'status': 'error',
+				'message': 'Invalid parameter sent!'
+			});
 		}
 	} else {
-		res.write('Error');
-		res.end();
+		res.json({
+			'status': 'error',
+			'message': 'Invalid command type sent!'
+		});
 	}
 });
 
@@ -235,42 +273,38 @@ app.get('/link/:input/:output', (req, res) => {
 	let input = req.params.input.toString();
 	let output = req.params.output.toString();
 
-	res.writeHead(200, { 'Content-Type': 'text/json' });
-
 	linkPins(input, output, success => {
 		if(success != true) {
 			const message = `Error while linking pin ${input} to output ${output} on GET request.`;
 			console.log(message);
-			res.end(json_encode({
+			res.json({
 				'status': 'error',
 				'message': message
-			}));
+			});
 		}
-		res.end(json_encode({
+		res.json({
 			'status': 'success',
 			'message': `Successfully linked input pin ${input} to output pin ${output}.`
-		}));
+		});
 	});
 });
 
 app.get('/rename-board/:name', (req, res) => {
 	let name = req.params.name.toString();
 
-	res.writeHead(200, { 'Content-Type': 'text/json' });
-
 	renameBoard(name, success => {
 		if(success != true) {
 			const message = 'Error while renaming board!';
 			console.log(message);
-			res.end(json_encode({
+			res.json({
 				'status': 'error',
 				'message': message
-			}));
+			});
 		}
-		res.end(json_encode({
+		res.json({
 			'status': 'success',
 			'message': 'Successfully renamed the board!'
-		}));
+		});
 	});
 });
 
@@ -278,71 +312,63 @@ app.get('/rename/:pin/:name', (req, res) => {
 	let pin = req.params.pin.toString();
 	let name = req.params.name.toString();
 
-	res.writeHead(200, { 'Content-Type': 'text/json' });
-
 	renamePin(pin, name, success => {
 		if(success != true) {
 			const message = 'Error while renaming pin!';
 			console.log(message);
-			res.end(json_encode({
+			res.json({
 				'status': 'error',
 				'message': message
-			}));
+			});
 		}
-		res.end(json_encode({
+		res.json({
 			'status': 'success',
 			'message': 'Successfully renamed the pin!'
-		}));
+		});
 	});
 });
 
 app.get('/unlink/:pin', (req, res) => {
 	let pin = req.params.pin.toString();
 
-	res.writeHead(200, { 'Content-Type': 'text/json' });
-
 	unlinkPin(pin, success => {
 		if(success != true) {
 			const message = `Error while unlinking pin ${pin}.`;
 			console.log(message);
-			res.end(json_encode({
+			res.json({
 				'status': 'error',
 				'message': message
-			}));
+			});
 		}
-		res.end(json_encode({
+		res.json({
 			'status': 'success',
 			'message': 'Successfully unlinked pin!'
-		}));
+		});
 	});
 });
 
 app.get('/remove/:pin', (req, res) => {
 	let pin = req.params.pin.toString();
 	
-	res.writeHead(200, { 'Content-Type': 'text/json' });
-
 	removePin(pin, success => {
 		if(success != true) {
 			const message = `Error while removing pin number ${pin}!`;
 			console.log(message);
-			res.end(json_encode({
+			res.json({
 				'status': 'error',
 				'message': message
-			}));
+			});
 		}
-		res.end(json_encode({
+		res.json({
 			'status': 'success',
 			'message': 'Successfully removed pin!'
-		}));
+		});
 	});
 });
 
 app.get('/set/:pin/:state', (req, res) => {
 	let pin = req.params.pin.toString();
 	let state = req.params.state.toString();
-
-	res.writeHead(200, { 'Content-Type': 'text/json' });
 
 	if(
 		availablePins.includes(pin) &&
@@ -355,28 +381,26 @@ app.get('/set/:pin/:state', (req, res) => {
 			if(success != true) {
 				const message = `Error on changing state of pin ${pin}.`;
 				console.error(message);
-				res.end(json_encode({
+				res.json({
 					'status': 'error',
 					'message': message
-				}));
+				});
 			}
-			res.end(json_encode({
+			res.json({
 				'status': 'success',
 				'message': 'Successfully set the state of pin!'
-			}));
+			});
 		});
 	} else {
-		res.end(json_encode({
+		res.json({
 			'status': 'error',
 			'message': 'Wrong parameters sent!'
-		}));
+		});
 	}
 });
 
-app.get('/get/:pin', (req, res) => {
-	let pin = req.params.pin.toString();
-
-	res.writeHead(200, { 'Content-Type': 'text/json' });
+app.get('/get/:pin?', (req, res) => {
+	let pin = req.params.pin;
 
 	const directions = {
 		'0': 'input',
@@ -386,7 +410,7 @@ app.get('/get/:pin', (req, res) => {
 
 	if(pin == null || pin == '' || pin == undefined) {
 		let pinDatas = [];
-		for(const pin in ioData.controllable_pins) {
+		for(let pin in ioData.controllable_pins) {
 			const pinData = {
 				'pinNumber': pin,
 				'direction': directions[ioData.controllable_pins[pin]],
@@ -396,19 +420,19 @@ app.get('/get/:pin', (req, res) => {
 			pinDatas.push(pinData);
 		}
 
-		res.end(json_encode({
+		res.json({
 			'status': 'success',
 			'message': pinDatas
-		}));
+		});
 	} else {
 		if(
 			!(availablePins.includes(pin)) ||
 			!(pin in ioData.controllable_pins)
 		) {
-			res.end(json_encode({
+			res.json({
 				'status': 'error',
 				'message': 'Invalid or unadded pin number!'
-			}));
+			});
 		}
 
 		const pinData = {
@@ -416,10 +440,10 @@ app.get('/get/:pin', (req, res) => {
 			'direction': directions[ioData.controllable_pins[pin]],
 			'state': ioData.pinStates[pin]
 		};
-		res.end(json_encode({
+		res.json({
 			'status': 'success',
 			'message': pinData
-		}));
+		});
 	}
 });
 
@@ -427,8 +451,6 @@ app.get('/add/:pin/:dir/:timeout?', (req, res) => {
 	let pin = req.params.pin.toString();
 	let dir = req.params.dir.toString();
 	let timeout = '0';
-
-	res.writeHead(200, { 'Content-Type': 'text/json' });
 
 	if(req.params.timeout) {
 		timeout = req.params.timeout.toString();
@@ -444,36 +466,36 @@ app.get('/add/:pin/:dir/:timeout?', (req, res) => {
 	if(!(dir in availableOptions) || !(availablePins.includes(pin))) {
 		const message = `Invalid parameters sent!`;
 		console.log(message);
-		res.end(json_encode({
+		res.json({
 			'status': 'error',
 			'message': message
-		}));
+		});
 	}
 
 	let mode = availableOptions[dir];
 	if(mode == '2' && (!timeout || isNaN(timeout) || timeout <= 0)) {
 		const message = 'Monostable mode has requested but no timeout has sent!';
 		console.log(message);
-		res.end(json_encode({
+		res.json({
 			'status': 'error',
 			'message': message
-		}));
+		});
 	}
 
 	addPin(pin, mode, (mode == '2' ? timeout : 0), success => {
 		if(success != true) {
 			const message = 'Error while adding new pin!';
 			console.log(message);
-			res.end(json_encode({
+			res.json({
 				'status': 'error',
 				'message': message
-			}));
+			});
 		}
 
-		res.end(json_encode({
+		res.json({
 			'status': 'success',
 			'message': `Pin number ${pin} has been added as ${dir}.`
-		}));
+		});
 	});
 });
 
